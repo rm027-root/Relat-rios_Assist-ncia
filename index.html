@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Assistência Informática</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+      padding: 30px;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    .section h2 {
+      color: #34495e;
+      font-size: 18px;
+      margin-bottom: 10px;
+      border-left: 4px solid #3498db;
+      padding-left: 10px;
+    }
+    .section p {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    ul li {
+      margin-bottom: 10px;
+    }
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #888;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Relatório de Assistência Informática</h1>
+
+    <div class="section">
+      <h2>🛠️ Descrição do Problema</h2>
+      <p>Dois postos de trabalho não conseguem aceder ao servidor <strong>PRIMAVERA</strong>.</p>
+    </div>
+
+    <div class="section">
+      <h2>✅ Ações Corretivas</h2>
+      <ul>
+        <li>A rede não dispõe de servidor DNS, impossibilitando a tradução do nome <strong>PRIMAVERA</strong> para o IP <strong>192.168.1.250</strong>. Foram configurados livros de DNS local em cada posto de trabalho.</li>
+        <li>Um dos postos estava com o Primavera apontado para dois endereços incorretos: <strong>192.168.1.100</strong> e <strong>192.168.1.150</strong>. Todos os valores de registo no Windows <strong>regedit</strong> foram atualizados para o IP correto <strong>192.168.1.250</strong>.</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      Relatório gerado por suporte técnico • Data: 28/10/2025
+    </div>
+  </div>
+</body>
+</html>
