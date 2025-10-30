@@ -2,13 +2,31 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Tetris Simples</title>
+  <title>Tetris com Botões</title>
   <style>
     canvas { background: #111; display: block; margin: auto; }
+    .controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    .controls button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <canvas id="tetris" width="240" height="400"></canvas>
+
+  <div class="controls">
+    <button onclick="playerMove(-1)">⬅️ Esquerda</button>
+    <button onclick="playerRotate(-1)">⤿ Girar Esquerda</button>
+    <button onclick="playerDrop()">⬇️ Baixar</button>
+    <button onclick="playerRotate(1)">⤾ Girar Direita</button>
+    <button onclick="playerMove(1)">➡️ Direita</button>
+  </div>
+
   <script src="tetris.js"></script>
 </body>
 </html>
