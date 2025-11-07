@@ -1,32 +1,520 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8">
-  <title>Tetris com Botões</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leitor de Relatórios de Inventário</title>
   <style>
-    canvas { background: #111; display: block; margin: auto; }
-    .controls {
-      text-align: center;
-      margin-top: 10px;
-    }
-    .controls button {
-      padding: 10px 20px;
-      margin: 5px;
-      font-size: 16px;
-    }
+    /* Layout base */
+    html, body { height: 100%; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; font-size: 13px; }
+    .page { min-height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: #003366; color: white; padding: 16px; }
+    h1 { margin: 0; font-size: 18px; }
+
+    .toolbar { padding: 8px 10px; background: #e0e0e0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .btn { padding: 6px 12px; border: none; background: #003366; color: white; cursor: pointer; border-radius: 4px; font-size: 13px; }
+    .btn[disabled] { opacity: .6; cursor: not-allowed; }
+    .meta { color:#333; font-size:11px; }
+
+    .control { font-size: 13px; padding: 6px 8px; border: 1px solid #b9c4d6; border-radius: 4px; background: #fff; }
+    .control:focus { outline: 2px solid #6aa1ff55; border-color: #6aa1ff; }
+
+    .container { flex: 1; display: flex; }
+    .list { width: 300px; border-right: 1px solid #ccc; overflow-y: auto; background: #fff; }
+    .list button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; background: none; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; }
+    .list button:hover { background: #f0f0f0; }
+
+    .details { flex: 1; padding: 14px; background: #fff; overflow-y: auto; }
+    .details .empty { color: #888; }
+
+    /* Tabelas */
+    .details table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; }
+    .details thead th { background: #003366; color: #fff; padding: 8px; font-weight: 700; font-size: 12.5px; }
+    .details tbody td { border: 1px solid #ddd; padding: 8px; word-wrap: break-word; font-size: 12.5px; }
+    /* Zebra rows para Lista Completa */
+    .details table.zebra tbody tr:nth-child(odd) { background: #ffffff; }
+    .details table.zebra tbody tr:nth-child(even) { background: #f2f2f2; }
+
+    /* Painel de imagem (dropzone) */
+    .image-card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fafafa; margin-bottom: 12px; }
+    .image-card header { background: #f0f3f9; color: #003366; padding: 8px 10px; font-weight: 700; font-size: 12.5px; border-bottom: 1px solid #d6dde8; }
+    .image-wrap { display: flex; align-items: center; justify-content: center; background: #fff; min-height: 220px; padding: 12px; }
+    .dropzone { width: 100%; min-height: 196px; border: 2px dashed #99a6c4; border-radius: 8px; display:flex; align-items:center; justify-content:center; cursor:pointer; background:#fff; }
+    .dropzone.drag { background: #eef3ff; border-color: #5a8dee; }
+    .dropzone img { max-width: 100%; height: auto; display: none; }
+    .dz-hint { color: #6b7a90; font-size: 12.5px; text-align:center; padding: 10px; }
+    .image-actions { display:flex; gap:8px; padding: 8px 10px; border-top: 1px solid #eee; background: #fafafa; }
+    .dim { color:#777; font-size: 12px; }
+
+    /* Notas */
+    .notes-card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fafafa; }
+    .notes-card header { background: #f0f3f9; color: #003366; padding: 8px 10px; font-weight: 700; font-size: 12.5px; border-bottom: 1px solid #d6dde8; }
+    .notes-wrap { background: #fff; padding: 10px; }
+    .notes-wrap textarea { width: 100%; border: 1px solid #c7d0de; border-radius: 6px; padding: 8px; font: inherit; resize: vertical; min-height: 84px; }
+    .save-flag { font-size: 11px; color: #2b6a2b; padding-left: 4px; }
+
+    /* Rodapé */
+    footer { background: #0d2a52; color: #f1f6ff; padding: 10px 14px; font-size: 12px; border-top: 1px solid #c7d0de33; text-align: center; }
+    footer .wrap { max-width: 1200px; margin: 0 auto; }
   </style>
 </head>
 <body>
-  <canvas id="tetris" width="240" height="400"></canvas>
+  <div class="page">
+    <header>
+      <h1>Leitor de Relatórios de Inventário</h1>
+    </header>
 
-  <div class="controls">
-    <button onclick="playerMove(-1)">⬅️ Esquerda</button>
-    <button onclick="playerRotate(-1)">⤿ Girar Esquerda</button>
-    <button onclick="playerDrop()">⬇️ Baixar</button>
-    <button onclick="playerRotate(1)">⤾ Girar Direita</button>
-    <button onclick="playerMove(1)">➡️ Direita</button>
+    <div class="toolbar">
+      <button id="btnProcessar" class="btn">Processar</button>
+      <button id="btnListaCompleta" class="btn" disabled>Lista Completa</button>
+      <button id="btnExport" class="btn" disabled>Exportar JSON</button>
+      <button id="btnImport" class="btn">Importar JSON</button>
+      <button id="btnCSV" class="btn" disabled>Exportar CSV</button>
+      <input id="searchBox" class="control" type="search" placeholder="Pesquisar…" />
+      <select id="brandFilter" class="control">
+        <option value="ALL">Todas as marcas</option>
+      </select>
+      <span id="info" class="meta"></span>
+      <input id="filePicker" type="file" accept=".txt" multiple style="display:none" />
+      <input id="jsonPicker" type="file" accept="application/json" style="display:none" />
+    </div>
+
+    <div class="container">
+      <div class="list" id="lista"></div>
+      <div class="details" id="detalhes"><div class="empty">Nenhuma máquina selecionada.</div></div>
+    </div>
+
+    <footer>
+      <div class="wrap">© Copyright 2025 | Lógica TI Service | Todos os direitos reservados | Desenvolvido por Ricardo Magaia</div>
+    </footer>
   </div>
 
-  <script src="tetris.js"></script>
+  <script>
+    (function(){
+      const btn = document.getElementById('btnProcessar');
+      const btnAll = document.getElementById('btnListaCompleta');
+      const btnExport = document.getElementById('btnExport');
+      const btnImport = document.getElementById('btnImport');
+      const btnCSV = document.getElementById('btnCSV');
+      const picker = document.getElementById('filePicker');
+      const jsonPicker = document.getElementById('jsonPicker');
+      const lista = document.getElementById('lista');
+      const detalhes = document.getElementById('detalhes');
+      const info = document.getElementById('info');
+      const searchBox = document.getElementById('searchBox');
+      const brandFilter = document.getElementById('brandFilter');
+
+      /** store: Map(machineName => { filename?, content?, fields, imageData?, notes?, lastModified? }) */
+      const store = new Map();
+      let currentMachine = null;
+      let viewMode = 'details'; // 'details' | 'full'
+
+      function setInfo(msg){ if(info) info.textContent = msg || ''; }
+      function hasAnyMediaOrNotes(){
+        for(const rec of store.values()){
+          if(rec.imageData || (rec.notes && rec.notes.trim() !== '')) return true;
+        }
+        return false;
+      }
+      function updateButtons(){
+        const hasData = store.size > 0;
+        btnAll.disabled = !hasData;
+        btnCSV.disabled = !hasData;
+        btnExport.disabled = !hasAnyMediaOrNotes();
+      }
+
+      function inferMachineName(filename){
+        let base = filename.replace(/\.[^/.]+$/,'');
+        base = base.replace(/^invent[áa]rio[_\- ]*/i, '');
+        return base || filename;
+      }
+
+      function normalize(str){
+        return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      }
+
+      function parseInventory(text, fallbackNome){
+        const fields = { nome: '', marca: '', modelo: '', proc: '', serie: '', disco: '', ram: '' };
+        const lines = String(text || '').split(/\r?\n/);
+        for(const ln of lines){
+          const m = ln.match(/^\s*([^:]+):\s*(.+)$/);
+          if(!m) continue;
+          const label = normalize(m[1].trim());
+          const val = m[2].trim();
+          if(label.includes('nome da maquina')) fields.nome = val;
+          else if(label.startsWith('marca')) fields.marca = val;
+          else if(label.startsWith('modelo')) fields.modelo = val;
+          else if(label.includes('processador') || label.includes('processor')) fields.proc = val;
+          else if(label.includes('numero de serie') || label.includes('nº de serie')) fields.serie = val;
+          else if(label.includes('capacidade total do disco') || label.includes('capacidade do disco rigido') || label.includes('capacidade do disco')) fields.disco = val;
+          else if(label.includes('quantidade de memoria ram') || label === 'memoria ram' || (label.includes('memoria') && val.toLowerCase().includes('gb'))) fields.ram = val;
+        }
+        if(!fields.nome) fields.nome = fallbackNome;
+        return fields;
+      }
+
+      function addFile(filename, content, lastModified){
+        const machine = inferMachineName(filename);
+        const fields = parseInventory(content, machine);
+        const prev = store.get(machine) || {};
+        store.set(machine, { ...prev, filename, content, fields, lastModified: lastModified ?? prev.lastModified ?? null });
+      }
+
+      // --- Filtros e pesquisa ---
+      function buildHaystack(machine, rec){
+        const f = rec.fields || { nome: machine };
+        return [machine, f.nome, f.marca, f.modelo, f.proc, f.serie, f.disco, f.ram, rec.notes || ''].filter(Boolean).join(' ');
+      }
+
+      function getFilteredEntries(){
+        const q = normalize(searchBox.value || '');
+        const brand = brandFilter.value || 'ALL';
+        const entries = Array.from(store.entries());
+        const filtered = entries.filter(([machine, rec]) => {
+          const okBrand = (brand === 'ALL') || (normalize(rec.fields?.marca||'') === normalize(brand));
+          if(!okBrand) return false;
+          if(!q) return true;
+          return normalize(buildHaystack(machine, rec)).includes(q);
+        });
+        filtered.sort((a,b)=> a[0].localeCompare(b[0], 'pt', { sensitivity: 'base' }));
+        return filtered;
+      }
+
+      function populateBrandFilter(){
+        const seen = new Set();
+        const brands = [];
+        for(const rec of store.values()){
+          const m = (rec.fields && rec.fields.marca) ? rec.fields.marca.trim() : '';
+          if(!m) continue;
+          const key = normalize(m);
+          if(!seen.has(key)){ seen.add(key); brands.push(m); }
+        }
+        brands.sort((a,b)=> a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+        brandFilter.innerHTML = '<option value="ALL">Todas as marcas</option>' + brands.map(b=>`<option value="${b}">${b}</option>`).join('');
+      }
+
+      // --- Renderizações ---
+      function renderList(){
+        lista.innerHTML = '';
+        if(store.size === 0){
+          lista.innerHTML = '<div class="empty" style="padding:10px;color:#666">Nenhum ficheiro carregado/importado.</div>';
+          return;
+        }
+        const entries = getFilteredEntries();
+        for(const [m, rec] of entries){
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = m;
+          b.title = rec?.filename || m;
+          b.addEventListener('click', ()=> showDetails(m));
+          lista.appendChild(b);
+        }
+        setInfo(`${entries.length} de ${store.size} máquinas`);
+      }
+
+      // Cabeçalhos
+      const HEADERS_SINGLE = ['Nome de máquina','Marca','Modelo','Processador','Número de Série','Capacidade total do disco','Quantidade de RAM'];
+      const HEADERS_FULL   = [...HEADERS_SINGLE, 'Last Update'];
+
+      function rowFromFields(fields){
+        return [fields.nome||'', fields.marca||'', fields.modelo||'', fields.proc||'', fields.serie||'', fields.disco||'', fields.ram||''];
+      }
+
+      function formatLastUpdate(ts){
+        if(!ts) return '-';
+        try{
+          return new Date(ts).toLocaleString(undefined, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        }catch(e){ return '-'; }
+      }
+
+      function renderTableRows(rows){
+        return rows.map(r=>`<tr>${r.map(v=>`<td>${v || '-'}</td>`).join('')}</tr>`).join('');
+      }
+
+      function renderSingleTable(fields){
+        const row = rowFromFields(fields);
+        return `
+          <table aria-label="Detalhes da máquina">
+            <thead><tr>${HEADERS_SINGLE.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead>
+            <tbody>${renderTableRows([row])}</tbody>
+          </table>`;
+      }
+
+      function renderFullTable(){
+        if(store.size === 0){
+          return '<div class="empty">Nenhum ficheiro carregado/importado.</div>';
+        }
+        const entries = getFilteredEntries();
+        const rows = entries.map(([machine, rec]) => {
+          const base = rowFromFields(rec.fields || { nome: machine });
+          base.push(formatLastUpdate(rec.lastModified));
+          return base;
+        });
+        setInfo(`${entries.length} de ${store.size} máquinas (filtradas)`);
+        return `
+          <table class="zebra" aria-label="Lista completa de máquinas">
+            <thead><tr>${HEADERS_FULL.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead>
+            <tbody>${renderTableRows(rows)}</tbody>
+          </table>`;
+      }
+
+      function renderMediaAndNotes(){
+        return `
+          <section class="image-card" aria-labelledby="img-title">
+            <header id="img-title">Foto do equipamento</header>
+            <div class="image-wrap">
+              <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Anexar imagem do equipamento">
+                <input id="fileInput" type="file" accept="image/*" style="display:none" />
+                <img id="previewImg" alt="Pré-visualização do equipamento" />
+                <div id="dzHint" class="dz-hint">Arraste e largue uma imagem aqui ou clique para escolher</div>
+              </div>
+            </div>
+            <div class="image-actions">
+              <span class="dim">A imagem e as notas podem ser exportadas/importadas em JSON. Nada é enviado para a internet.</span>
+            </div>
+          </section>
+          <section class="notes-card" aria-labelledby="notes-title">
+            <header id="notes-title">Notas adicionais</header>
+            <div class="notes-wrap">
+              <textarea id="notesArea" rows="4" placeholder="Observações (ex.: estado físico, etiqueta interna, localização, nº inventário…)"></textarea>
+              <span id="saveFlag" class="save-flag" aria-live="polite"></span>
+            </div>
+          </section>`;
+      }
+
+      function initDropzoneAndNotes(machine){
+        const rec = store.get(machine);
+        const dz = document.getElementById('dropzone');
+        const input = document.getElementById('fileInput');
+        const img = document.getElementById('previewImg');
+        const hint = document.getElementById('dzHint');
+        const notes = document.getElementById('notesArea');
+        const flag = document.getElementById('saveFlag');
+
+        function updatePreview(){
+          if(rec && rec.imageData){ img.src = rec.imageData; img.style.display = 'block'; hint.style.display = 'none'; }
+          else { img.removeAttribute('src'); img.style.display = 'none'; hint.style.display = 'block'; }
+        }
+
+        function showSaved(){ if(flag){ flag.textContent = 'Guardado'; setTimeout(()=> flag.textContent = '', 1200); } updateButtons(); }
+
+        function handleFiles(fileList){
+          const file = Array.from(fileList || []).find(f => f.type && f.type.startsWith('image/'));
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            rec.imageData = reader.result; // data URL
+            updatePreview();
+            showSaved();
+          };
+          reader.readAsDataURL(file);
+        }
+
+        // eventos dropzone
+        dz.addEventListener('click', () => input.click());
+        dz.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); input.click(); }});
+        dz.addEventListener('dragover', (e)=>{ e.preventDefault(); dz.classList.add('drag'); });
+        dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+        dz.addEventListener('drop', (e)=>{ e.preventDefault(); dz.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+        input.addEventListener('change', (e)=> handleFiles(e.target.files));
+
+        // notas
+        notes.value = rec && rec.notes ? rec.notes : '';
+        notes.addEventListener('input', ()=>{ rec.notes = notes.value; showSaved(); });
+
+        updatePreview();
+      }
+
+      function showDetails(machine){
+        const rec = store.get(machine);
+        if(!rec){ return; }
+        currentMachine = machine;
+        viewMode = 'details';
+        detalhes.innerHTML = renderSingleTable(rec.fields || { nome: machine }) + renderMediaAndNotes();
+        initDropzoneAndNotes(machine);
+      }
+
+      /** Exportar JSON (apenas foto/notas) */
+      function exportJSON(){
+        const items = {};
+        for(const [machine, rec] of store.entries()){
+          const has = !!(rec && (rec.imageData || (rec.notes && rec.notes.trim() !== '')));
+          if(!has) continue;
+          items[machine] = { imageData: rec.imageData || null, notes: rec.notes || '' };
+        }
+        const payload = { version: 1, generatedAt: new Date().toISOString(), items };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const ts = new Date();
+        const pad = n => String(n).padStart(2,'0');
+        const fname = `inventario_media_notas_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.json`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname; document.body.appendChild(a); a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+      }
+
+      /** Exportar CSV (respeita filtros atuais) */
+      function csvEscape(val){
+        const s = (val==null? '' : String(val));
+        if(/[";\n\r,]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+        return s;
+      }
+      function exportCSV(){
+        const entries = getFilteredEntries();
+        const header = HEADERS_FULL.join(';');
+        const lines = entries.map(([machine, rec]) => {
+          const f = rec.fields || { nome: machine, marca:'', modelo:'', proc:'', serie:'', disco:'', ram:'' };
+          const row = [f.nome, f.marca, f.modelo, f.proc, f.serie, f.disco, f.ram, formatLastUpdate(rec.lastModified)];
+          return row.map(csvEscape).join(';');
+        });
+        const content = 'sep=;\n' + header + '\n' + lines.join('\n');
+        const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+        const ts = new Date();
+        const pad = n => String(n).padStart(2,'0');
+        const fname = `inventario_lista_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.csv`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname; document.body.appendChild(a); a.click();
+        setInfo('Encontre o file em Downloads');
+        setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+      }
+
+      /** Importar JSON (merge) */
+      function importJSONText(text){
+        try{
+          const data = JSON.parse(text);
+          const items = (data && data.items) ? data.items : data; // aceita plano B: direto no root
+          if(!items || typeof items !== 'object') { setInfo('JSON inválido: sem items.'); return; }
+          let applied = 0;
+          for(const machine of Object.keys(items)){
+            const entry = items[machine] || {};
+            const rec = store.get(machine) || { fields: { nome: machine, marca:'', modelo:'', proc:'', serie:'', disco:'', ram:'' } };
+            if(entry.imageData) rec.imageData = entry.imageData;
+            if(typeof entry.notes === 'string') rec.notes = entry.notes;
+            store.set(machine, rec);
+            applied++;
+          }
+          setInfo(`Importados ${applied} registos do JSON.`);
+          populateBrandFilter();
+          renderList();
+          updateButtons();
+          if(viewMode === 'full') detalhes.innerHTML = renderFullTable();
+          if(currentMachine && store.has(currentMachine) && viewMode === 'details'){
+            showDetails(currentMachine);
+          }
+        }catch(e){ setInfo('Falha ao ler JSON.'); }
+      }
+
+      /** leitura robusta: UTF-8/UTF-16LE/BE (com/sem BOM) */
+      async function readTextSmart(file){
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        if(bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE){
+          return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+        }
+        if(bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF){
+          return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+        }
+        if(bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF){
+          return new TextDecoder('utf-8').decode(bytes.subarray(3));
+        }
+        // heurística UTF-16 sem BOM
+        let zerosLE = 0, zerosBE = 0, sample = Math.min(bytes.length, 4000);
+        for(let i=0;i<sample;i+=2){
+          if(bytes[i] === 0) zerosLE++;
+          if(bytes[i+1] === 0) zerosBE++;
+        }
+        if(zerosLE > sample/8){ try { return new TextDecoder('utf-16le').decode(bytes); } catch(e){} }
+        if(zerosBE > sample/8){ try { return new TextDecoder('utf-16be').decode(bytes); } catch(e){} }
+        return new TextDecoder('utf-8').decode(bytes);
+      }
+
+      // Eventos toolbar
+      btn.addEventListener('click', async () => {
+        // Tenta abrir uma pasta; se não achar .txt ou der erro, cai no seletor de ficheiros
+        if('showDirectoryPicker' in window){
+          try {
+            const dir = await window.showDirectoryPicker({ mode: 'read' });
+            let loaded = 0;
+            store.clear();
+            for await (const [name, handle] of dir.entries()){
+              if(handle.kind === 'file' && name.toLowerCase().endsWith('.txt')){
+                const file = await handle.getFile();
+                const text = await readTextSmart(file);
+                addFile(file.name, text, file.lastModified);
+                loaded++;
+              }
+            }
+            if (loaded > 0) {
+              setInfo(`Carregados ${loaded} ficheiros .txt.`);
+              populateBrandFilter();
+              renderList();
+              updateButtons();
+              return; // sucesso: não precisa fallback
+            } else {
+              setInfo('Nenhum .txt encontrado na pasta. Selecione os ficheiros manualmente…');
+              // sem return -> abre o seletor em baixo
+            }
+          } catch (err){
+            if(err && err.name === 'AbortError'){ setInfo('Seleção cancelada.'); }
+            else { setInfo('Não foi possível abrir a pasta. A usar método alternativo…'); }
+            // continua para o seletor
+          }
+        }
+        // Fallback universal: seletor de múltiplos .txt
+        picker.value = '';
+        picker.click();
+      });
+
+      btnAll.addEventListener('click', () => {
+        viewMode = 'full';
+        detalhes.innerHTML = renderFullTable();
+      });
+
+      btnExport.addEventListener('click', exportJSON);
+      btnCSV.addEventListener('click', exportCSV);
+
+      btnImport.addEventListener('click', ()=>{ jsonPicker.value=''; jsonPicker.click(); });
+      jsonPicker.addEventListener('change', async (ev)=>{
+        const file = ev.target.files && ev.target.files[0];
+        if(!file) return;
+        const text = await readTextSmart(file);
+        importJSONText(text);
+      });
+
+      // Seleção de múltiplos .txt (fallback)
+      picker.addEventListener('change', async (ev)=>{
+        const files = Array.from(ev.target.files || []);
+        let loaded = 0;
+        store.clear();
+        for(const file of files){
+          if(!file.name.toLowerCase().endsWith('.txt')) continue;
+          const text = await readTextSmart(file);
+          addFile(file.name, text, file.lastModified);
+          loaded++;
+        }
+        setInfo(loaded ? `Carregados ${loaded} ficheiros .txt.` : 'Nenhum .txt selecionado.');
+        populateBrandFilter();
+        renderList();
+        updateButtons();
+      });
+
+      // Pesquisa e filtro
+      function onFilterChange(){
+        renderList();
+        if(viewMode === 'full') detalhes.innerHTML = renderFullTable();
+      }
+      searchBox.addEventListener('input', onFilterChange);
+      brandFilter.addEventListener('change', onFilterChange);
+
+      // Inicializa
+      populateBrandFilter();
+      renderList();
+      updateButtons();
+      setInfo('Dica: use "Lista Completa" para ver/exportar a tabela (respeita a pesquisa e filtros).');
+    })();
+  </script>
 </body>
 </html>
